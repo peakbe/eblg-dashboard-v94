@@ -244,51 +244,73 @@ function updateSonometers(runway) {
     });
 }
 
-function updateSonometersAdvanced(runway, phase) {
-    Object.values(sonometers).forEach(s => {
-        s.marker.setStyle({ color: "gray", fillColor: "gray" });
-    });
+function updateSonometerPanel() {
+    const list = document.getElementById("sono-list");
+    const stats = document.getElementById("sono-stats");
+    if (!list || !stats) return;
 
-    if (runway === "UNKNOWN") return;
+    const all = Object.values(sonometers);
 
-    let green = [];
-    let red = [];
+    // Détection couleur réelle
+    const green = all.filter(s => s.marker.options.color === "green");
+    const red   = all.filter(s => s.marker.options.color === "red");
+    const gray  = all.filter(s => s.marker.options.color === "gray");
 
-    if (runway === "22") {
-        if (phase === "takeoff") {
-            green = ["F002","F003","F004","F005","F006","F007","F008","F009","F010","F011","F012","F013","F016"];
-        } else {
-            green = ["F001","F014","F015","F017"];
-        }
-    }
+    // Compteur dynamique
+    stats.innerHTML =
+        `<b>${green.length}</b> verts – <b>${red.length}</b> rouges – <b>${gray.length}</b> neutres`;
 
-    if (runway === "04") {
-        if (phase === "takeoff") {
-            green = ["F002","F003","F007","F008","F009","F011","F013"];
-            red   = ["F004","F005","F006","F010","F012","F016"];
-        } else {
-            green = ["F014","F015"];
-            red   = ["F001","F017"];
-        }
-    }
+    // Tri automatique
+    const sorted = [...green, ...red, ...gray];
 
-    green.forEach(id => {
-        if (sonometers[id]) {
-            sonometers[id].marker.setStyle({ color: "green", fillColor: "green" });
-        }
-    });
+    // Liste
+    list.innerHTML = sorted.map(s => {
+        let cls = "sono-gray";
+        if (s.marker.options.color === "green") cls = "sono-green";
+        if (s.marker.options.color === "red") cls = "sono-red";
 
-    red.forEach(id => {
-        if (sonometers[id]) {
-            sonometers[id].marker.setStyle({ color: "red", fillColor: "red" });
-        }
-    });
-}
-function updateSonometersAdvanced(runway, phase) {
-    ...
+        return `<div class="sono-item ${cls}">
+                    <span>${s.id}</span>
+                </div>`;
+    }).join("");
+
+    // Mise à jour du mini‑graphique
+    updateSonoChart(green.length, red.length, gray.length);
 }
 
-// 👉 COLLER ICI
+function updateSonoChart(g, r, y) {
+    const canvas = document.getElementById("sono-chart");
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const total = g + r + y || 1;
+
+    const barWidth = 60;
+    const spacing = 20;
+    const baseY = 55;
+
+    // Échelle simple
+    const scale = 50 / total;
+
+    // Barres
+    ctx.fillStyle = "green";
+    ctx.fillRect(10, baseY - g * scale, barWidth, g * scale);
+
+    ctx.fillStyle = "red";
+    ctx.fillRect(10 + barWidth + spacing, baseY - r * scale, barWidth, r * scale);
+
+    ctx.fillStyle = "gray";
+    ctx.fillRect(10 + 2 * (barWidth + spacing), baseY - y * scale, barWidth, y * scale);
+
+    // Labels
+    ctx.fillStyle = "#333";
+    ctx.fillText("V", 35, baseY + 10);
+    ctx.fillText("R", 35 + barWidth + spacing, baseY + 10);
+    ctx.fillText("N", 35 + 2 * (barWidth + spacing), baseY + 10);
+}
+
 function updateSonometerPanel() {
     const container = document.getElementById("sono-list");
     if (!container) return;
@@ -464,6 +486,14 @@ function initMap() {
     // Sonomètres
     initSonometers(map);
 }
+
+document.getElementById("sono-header").onclick = () => {
+    const panel = document.getElementById("sono-panel");
+    const toggle = document.getElementById("sono-toggle");
+
+    panel.classList.toggle("expanded");
+    toggle.textContent = panel.classList.contains("expanded") ? "⯆" : "⯈";
+};
 
 // ======================================================
 // INITIALISATION GLOBALE
