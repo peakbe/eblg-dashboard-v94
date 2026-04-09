@@ -1,52 +1,80 @@
 // ======================================================
-// HELPERS
+// HELPERS — VERSION PRO+
+// fetch JSON, status panel, distance, utils
 // ======================================================
 
+
+// ------------------------------------------------------
+// Logging PRO+
+// ------------------------------------------------------
+const IS_DEV = location.hostname.includes("localhost") || location.hostname.includes("127.0.0.1");
+const log = (...a) => IS_DEV && console.log("[HELPERS]", ...a);
+const logErr = (...a) => console.error("[HELPERS ERROR]", ...a);
+
+
+// ======================================================
+// 1) Fetch JSON sécurisé
+// ======================================================
 export async function fetchJSON(url) {
     try {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return await res.json();
+        const res = await fetch(url, { cache: "no-store" });
+
+        if (!res.ok) {
+            logErr("HTTP error", res.status, url);
+            return { fallback: true };
+        }
+
+        const data = await res.json();
+        return data;
+
     } catch (err) {
-        console.error("Erreur fetch :", err);
-        return { fallback: true, error: err.message };
+        logErr("Erreur fetchJSON :", err);
+        return { fallback: true };
     }
 }
 
-export function deg2rad(d) {
-    return d * Math.PI / 180;
+
+// ======================================================
+// 2) Mise à jour panneau statut (METAR/TAF/FIDS)
+// ======================================================
+export function updateStatusPanel(label, data) {
+    try {
+        const el = document.getElementById("status-panel");
+        if (!el) return;
+
+        const ok = !data.fallback;
+
+        const row = document.createElement("div");
+        row.className = ok ? "status-ok" : "status-fail";
+        row.textContent = `${label} : ${ok ? "OK" : "Erreur"}`;
+
+        el.appendChild(row);
+
+    } catch (err) {
+        logErr("Erreur updateStatusPanel :", err);
+    }
 }
 
-export function haversineDistance(a, b) {
-    const R = 6371;
-    const dLat = deg2rad(b[0] - a[0]);
-    const dLon = deg2rad(b[1] - a[1]);
-    const lat1 = deg2rad(a[0]);
-    const lat2 = deg2rad(b[0]);
 
-    const h = Math.sin(dLat/2)**2 +
-              Math.cos(lat1) * Math.cos(lat2) *
-              Math.sin(dLon/2)**2;
+// ======================================================
+// 3) Distance Haversine (km)
+// ======================================================
+export function haversineDistance([lat1, lon1], [lat2, lon2]) {
+    try {
+        const R = 6371;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
 
-    return 2 * R * Math.asin(Math.sqrt(h));
-}
+        const a =
+            Math.sin(dLat / 2) ** 2 +
+            Math.cos(lat1 * Math.PI / 180) *
+            Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon / 2) ** 2;
 
-export function updateStatusPanel(service, data) {
-    const panel = document.getElementById("status-panel");
-    if (!panel) return;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-    if (data.fallback) {
-        panel.className = "status-fallback";
-        panel.innerText = `${service} : fallback (source offline)`;
-        return;
+    } catch (err) {
+        logErr("Erreur haversineDistance :", err);
+        return 0;
     }
-
-    if (data.error) {
-        panel.className = "status-offline";
-        panel.innerText = `${service} : offline`;
-        return;
-    }
-
-    panel.className = "status-ok";
-    panel.innerText = `${service} : OK`;
 }
